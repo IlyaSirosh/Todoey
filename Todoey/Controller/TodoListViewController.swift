@@ -14,16 +14,17 @@ class TodoListViewController: UITableViewController {
     let dataService = DataService.instance
     var list: TodoList! {
         didSet{
-            items = dataService.getItems(of: list)
+            loadData()
         }
     }
     var items: [TodoListItem] = []
+    var searchString: String?
     
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        navigationItem.title = list.name!
+        navigationItem.title = list.name
         
         searchBar.delegate = self
     }
@@ -54,9 +55,8 @@ class TodoListViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let item = items[indexPath.row]
-        item.done = !item.done
         
-        dataService.update(item)
+        dataService.toggle(item)
         self.tableView.reloadData()
         if let cell = tableView.cellForRow(at: indexPath) {
             updateCheckMark(cell, isChecked: item.done)
@@ -70,14 +70,13 @@ class TodoListViewController: UITableViewController {
     @IBAction func onAddItemPressed(_ sender: UIBarButtonItem) {
         
         var alertTextField = UITextField()
-        let alertController = UIAlertController(title: "Add new item to \(list.name!)", message: "", preferredStyle: .alert)
+        let alertController = UIAlertController(title: "Add new item to \(list.name)", message: "", preferredStyle: .alert)
         
         let alertAction = UIAlertAction(title: "Add", style: .default) { (action) in
             
             if let item = alertTextField.text {
-                let savedItem = self.dataService.add(to: self.list, itemTitle: item)
-                self.items.append(savedItem)
-                self.tableView.reloadData()
+                self.dataService.add(to: self.list, itemTitle: item)
+                self.loadData()
             }
         }
         
@@ -94,6 +93,11 @@ class TodoListViewController: UITableViewController {
         present(alertController, animated: true, completion: nil)
     }
     
+    private func loadData(){
+        items = dataService.getItems(of: list, thatContain: searchString)
+        tableView.reloadData()
+    }
+    
 }
 
 extension TodoListViewController: UISearchBarDelegate {
@@ -101,22 +105,19 @@ extension TodoListViewController: UISearchBarDelegate {
     
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         
-        items = dataService.getItems(of: list, thatContain: searchBar.text)
-        tableView.reloadData()
-        DispatchQueue.main.async {
-            searchBar.resignFirstResponder()
-        }
+        searchString = searchBar.text
+        loadData()
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        items = dataService.getItems(of: list, thatContain: searchText)
-
+        searchString = searchText
+        
         if searchText.isEmpty {
             DispatchQueue.main.async {
                 searchBar.resignFirstResponder()
             }
         }
         
-        tableView.reloadData()
+        loadData()
     }
 }

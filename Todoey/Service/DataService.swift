@@ -7,19 +7,17 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class DataService {
     public static let instance = DataService()
-    private var context: NSManagedObjectContext {
-        (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    }
+    private let realm: Realm
     private var lists: [TodoList] = []
     
     private init(){
-        loadLists()
-        
 //        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+        realm = try! Realm()
+        loadLists()
     }
 
     
@@ -29,89 +27,97 @@ class DataService {
     
     
     public func addList(with name: String){
-        let list = TodoList(context: context)
+        let list = TodoList()
         list.name = name
-        
         lists.append(list)
-        saveData()
+        
+        save(list)
     }
     
     public func getItems(of list: TodoList, thatContain searchString: String? = nil) -> [TodoListItem] {
-        
-        let request: NSFetchRequest<TodoListItem> = TodoListItem.fetchRequest()
-        
-        if let searchString = searchString, !searchString.isEmpty{
-            request.predicate = NSPredicate(format: "title CONTAINS %@", searchString)
+    
+        if let searchString = searchString, !searchString.isEmpty {
+            let predicate = NSPredicate(format: "title CONTAINS %@", searchString)
+            
+            return loadItems(of: list, with: predicate)
         }
         
-        return loadItems(of: list, with: request)
+        return loadItems(of: list)
     }
     
-    public func update(_ item: TodoListItem) {
-        saveData()
+    public func toggle(_ item: TodoListItem) {
+        do {
+            try realm.write {
+                item.done = !item.done
+            }
+        } catch {
+            print("Error updating item \(item) \(error)")
+        }
     }
     
-    public func add(to list: TodoList, itemTitle: String) -> TodoListItem {
-        let item = TodoListItem(context: context)
-        item.title = itemTitle
-        item.done = false
-        item.list = list
+    public func add(to list: TodoList, itemTitle: String) {
         
-        saveData()
+        do {
+            try realm.write {
+                let item = TodoListItem()
+                item.title = itemTitle
+                item.done = false
+                
+                list.items.append(item)
+            }
+        } catch {
+            print("Error saving '\(itemTitle)' of '\(list.name)' to Realm")
+        }
         
-        return item
     }
     
-    public func delete(_ item: TodoListItem){
-        context.delete(item)
-        saveData()
+    public func deleteItem(_ item: TodoListItem){
+        delete(item)
     }
     
-    public func delete(_ list: TodoList){
-        context.delete(list)
+    public func deleteList(_ list: TodoList){
+        delete(list)
         
         lists.removeAll(where: { $0.name == list.name })
-        
-        saveData()
     }
     
-    private func saveData() {
-        if context.hasChanges {
-            do {
-                try context.save()
-            } catch {
-                let nserror = error as NSError
-                print("Error saving context \(nserror), \(nserror.userInfo)")
+    private func save(_ object: Object) {
+        do {
+            try realm.write {
+                realm.add(object)
             }
+        } catch {
+            print("Error saving object \(object) to Realm")
+        }
+        
+    }
+    
+    private func delete(_ object: Object) {
+        do {
+            try realm.write {
+                realm.delete(object)
+            }
+        } catch {
+            print("Error deleting object \(object) to Realm")
         }
     }
     
-    private func loadLists(with request: NSFetchRequest<TodoList> = TodoList.fetchRequest()) {
-        do {
-            lists = try context.fetch(request)
-        } catch {
-            print("Error loading data from context \(error)")
-        }
+    
+    private func loadLists() {
+        let result = realm.objects(TodoList.self)
+        lists = result.map { $0 }
     }
     
-    private func loadItems(of list: TodoList, with request: NSFetchRequest<TodoListItem> = TodoListItem.fetchRequest()) -> [TodoListItem]{
-        
-        let predicate = NSPredicate(format: "list.name MATCHES %@", list.name!)
-        
-        if let additionalPredicate = request.predicate {
-            let compoundPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, additionalPredicate])
-            request.predicate = compoundPredicate
-        } else {
-            request.predicate = predicate
-        }
-        
-        var items = [TodoListItem]()
-        do {
-            items = try context.fetch(request)
-        } catch {
-            print("Error loading items of list '\(list.name!)' from context \(error)")
-        }
-        
-        return items
+    private func loadItems(of list: TodoList) -> [TodoListItem]{
+        return list.items
+            .sorted(byKeyPath: "dateAdded", ascending: true)
+            .map { $0 }
+    }
+    
+    private func loadItems(of list: TodoList, with predicate: NSPredicate) -> [TodoListItem]{
+        return list.items
+            .filter(predicate)
+            .sorted(byKeyPath: "dateAdded", ascending: true)
+            .map { $0 }
     }
 }
