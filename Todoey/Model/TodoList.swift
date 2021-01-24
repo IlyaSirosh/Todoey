@@ -11,5 +11,6 @@ import RealmSwift
 
 class TodoList: Object {
     @objc dynamic var name: String = ""
+    @objc dynamic var backgroundColor: String = ""
     let items = List<TodoListItem>()
 }

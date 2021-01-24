@@ -7,8 +7,10 @@
 //
 
 import UIKit
+import SwipeCellKit
+import ChameleonFramework
 
-class ListsViewController: UITableViewController {
+class ListsViewController: SwipeTableViewController {
     
     let dataService: DataService = DataService.instance
 
@@ -18,6 +20,30 @@ class ListsViewController: UITableViewController {
         let barButton = UIBarButtonItem()
         barButton.title = ""
         navigationItem.backBarButtonItem = barButton
+        
+        view.backgroundColor = UIColor(named: "mainColor")
+        
+        delegate = self
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        guard let navBar = navigationController?.navigationBar, let navItem = navigationController?.navigationItem else {
+            fatalError("No navbar for lists controller")
+        }
+        
+        let color = UIColor(named: "mainColor")!
+        let contrast = UIColor(contrastingBlackOrWhiteColorOn: color, isFlat: true)
+        
+        let attributes = [ NSAttributedString.Key.foregroundColor:  contrast]
+        navBar.titleTextAttributes = attributes
+        navBar.largeTitleTextAttributes = attributes
+        
+        navBar.backgroundColor = color
+        navBar.barTintColor = color
+        
+        navBar.prefersLargeTitles = true
+        
+        navItem.largeTitleDisplayMode = .always
     }
     
     //MARK: - DataSource
@@ -27,10 +53,11 @@ class ListsViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoListCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
-        let lists = dataService.getLists()
-        cell.textLabel?.text = lists[indexPath.row].name
+        let list = dataService.getLists()[indexPath.row]
+        cell.textLabel?.text = list.name
+        cell.backgroundColor = UIColor(hexString: list.backgroundColor)
         
         return cell
     }
@@ -81,3 +108,10 @@ class ListsViewController: UITableViewController {
     
 }
 
+extension ListsViewController: SwipeTableViewControllerDelegate {
+    
+    func swipeTableView(_ tableView: UITableView, deleteCellAtRow indexPath: IndexPath) {
+        let list = dataService.getLists()[indexPath.row]
+        dataService.deleteList(list)
+    }
+}

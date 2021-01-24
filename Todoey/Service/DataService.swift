@@ -15,20 +15,20 @@ class DataService {
     private var lists: [TodoList] = []
     
     private init(){
-//        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         realm = try! Realm()
-        loadLists()
     }
 
     
     public func getLists() -> [TodoList] {
-        return lists
+        return loadLists()
     }
     
     
     public func addList(with name: String){
         let list = TodoList()
         list.name = name
+        list.backgroundColor = UIColor.randomFlat().hexValue()
         lists.append(list)
         
         save(list)
@@ -77,8 +77,6 @@ class DataService {
     
     public func deleteList(_ list: TodoList){
         delete(list)
-        
-        lists.removeAll(where: { $0.name == list.name })
     }
     
     private func save(_ object: Object) {
@@ -103,9 +101,9 @@ class DataService {
     }
     
     
-    private func loadLists() {
+    private func loadLists() -> [TodoList] {
         let result = realm.objects(TodoList.self)
-        lists = result.map { $0 }
+        return result.map { $0 }
     }
     
     private func loadItems(of list: TodoList) -> [TodoListItem]{
